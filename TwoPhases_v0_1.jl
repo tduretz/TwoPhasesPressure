@@ -15,7 +15,7 @@ function main()
     Δ    = (x=(x.max-x.min)/nc.x, y=(y.max-y.min)/nc.y)
     x    = (c=LinRange(x.min-Δ.x/2, x.max+Δ.x/2, nc.x), v=LinRange(x.min-Δ.x, x.max+Δ.x, nv.x))
     y    = (c=LinRange(y.min-Δ.y/2, y.max+Δ.y/2, nc.y), v=LinRange(y.min-Δ.y, y.max+Δ.y, nv.y))
-    BC   = (W=:Dirichlet, E=:Dirichlet, S=:Dirichlet, N=:Dirichlet)
+    # BC   = (W=:Dirichlet, E=:Dirichlet, S=:Dirichlet, N=:Dirichlet)
 
     # Primitive variables
     V     = (x=zeros(nv.x, nc.y), y=zeros(nc.x, nv.y))
