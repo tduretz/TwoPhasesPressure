@@ -7,14 +7,21 @@ import Plots
 # Makie.update_theme!(fonts = (regular = texfont(), bold = texfont(:bold), italic = texfont(:italic)))
 
 function main()
-   
-    ηs0   = 1.0
-    k_ηf0 = 0.001
-    ηϕ0   = 1
-    len   = 1e0
+    # Adimensionnal numbers
+    Ωη = 0.0001
+    Ωl = 0.001
+    # Independant
+    ηs0 = 1
+    len = 1
+    ε̇bg = 1
+    ηs_ηs0 = 10
+    # Dependant
+    ηϕ0 = Ωη * ηs0
+    k_ηf0 = (len.^2 * Ωl^2) / (ηϕ0 + 4/3 * ηs0)
+    r     = len / 10
+
     xlim = (min=-len/2, max=len/2)
     ylim = (min=-len/2, max=len/2)
-    r     = len / 10
     nc   = (x=100, y=100)
     nv   = (x=nc.x+1, y=nc.y+1)
     nc   = (x=nc.x+0, y=nc.y+0)
@@ -44,12 +51,9 @@ function main()
     ηϕ   = ηϕ0*ones(nc...)
 
     # Initial condition
-    @. ηs.v[x.v^2 + (y.v.^2)'<r^2] = 10 * ηs0
+    @. ηs.v[x.v^2 + (y.v.^2)'<r^2] = ηs_ηs0 .* ηs0
     @. ηs.c = 0.25*(ηs.v[1:end-1,1:end-1] + ηs.v[2:end-0,1:end-1] + ηs.v[1:end-1,2:end-0] + ηs.v[2:end-0,2:end-0])
-
-    # Boundary condition
-    ε̇bg = 1.
-
+   
     # Pure shear
     BC   = (W=:Neumann, E=:Neumann, S=:Neumann, N=:Neumann)
     VxBC = (S=zeros(nv.x), N=zeros(nv.x))
@@ -99,7 +103,11 @@ function main()
     τxy_c = 0.25*(τ.xy[1:end-1,1:end-1] + τ.xy[2:end-0,1:end-1] + τ.xy[1:end-1,2:end-0] + τ.xy[2:end-0,2:end-0]) 
     τII   = sqrt.( 0.5*τ.xx.^2 + 0.5*τ.yy.^2 + τxy_c.^2 )
     lc    = sqrt.(k_ηf0 * (ηϕ0 + 4/3 * ηs0))
-    println("Compaction length: ",lc)
+    println("Compaction length ratio: ",lc/len)
+    println("ηs0 / ηb0: ", ηs0 / ηϕ0)
+    println("√k / L: ", sqrt(k_ηf0) / len)
+    println("√(k.ηϕ0) / L: ", sqrt(k_ηf0 * ηϕ0) / len)
+    println("√(k.ηs0) / L: ", sqrt(k_ηf0 * ηs0) / len)
     p1 = Plots.heatmap(x.v, y.c, V.x[:,2:end-1]', title="Vx")
     p2 = Plots.heatmap(x.c, y.v, V.y[2:end-1,:]', title="Vy")
     p3 = Plots.heatmap(x.c, y.c, ε̇II', title="ε̇II")
