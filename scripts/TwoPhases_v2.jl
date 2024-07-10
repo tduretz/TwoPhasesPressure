@@ -8,17 +8,17 @@ import Plots
 
 function main()
     # Adimensionnal numbers
-    Ωη = 0.0001
-    Ωl = 0.001
+    Ωη     = 0.0001     # Ratio ηϕ / ηs
+    Ωl     = 0.001      # Ratio √(k_ηf0 * (ηϕ + 4/3 * ηs)) / len
+    ηs_ηs0 = 10         # Ratio (inclusion viscosity) / (matrix viscosity)
     # Independant
-    ηs0 = 1
-    len = 1
-    ε̇bg = 1
-    ηs_ηs0 = 10
+    ηs0    = 1          # Shear viscosity
+    len    = 1          # Box size
+    ε̇bg    = 1          # Background strain rate
     # Dependant
-    ηϕ0 = Ωη * ηs0
-    k_ηf0 = (len.^2 * Ωl^2) / (ηϕ0 + 4/3 * ηs0)
-    r     = len / 10
+    ηϕ0    = Ωη * ηs0   # Bulk viscosity
+    k_ηf0  = (len.^2 * Ωl^2) / (ηϕ0 + 4/3 * ηs0) # Permeability / fluid viscosity
+    r      = len/10     # Inclusion radius
 
     xlim = (min=-len/2, max=len/2)
     ylim = (min=-len/2, max=len/2)
