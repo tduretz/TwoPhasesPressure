@@ -1,40 +1,8 @@
-using Plots, LinearAlgebra, ExtendableSparse
-
-function main()
-
-    ηs0   = 1.0
-    k_ηf0 = 1.0
-    ηϕ0   = 1.0
-
-    x    = (min=-0.5, max=0.5)
-    y    = (min=-0.5, max=0.5)
-    nc   = (x=20, y=10)
-    nv   = (x=nc.x+1, y=nc.y+1)
-    nc   = (x=nc.x+0, y=nc.y+0)
-    nv   = (x=nv.x+0, y=nv.y+0)
-    Δ    = (x=(x.max-x.min)/nc.x, y=(y.max-y.min)/nc.y)
-    x    = (c=LinRange(x.min-Δ.x/2, x.max+Δ.x/2, nc.x), v=LinRange(x.min-Δ.x, x.max+Δ.x, nv.x))
-    y    = (c=LinRange(y.min-Δ.y/2, y.max+Δ.y/2, nc.y), v=LinRange(y.min-Δ.y, y.max+Δ.y, nv.y))
-    # BC   = (W=:Dirichlet, E=:Dirichlet, S=:Dirichlet, N=:Dirichlet)
-
-    # Primitive variables
-    V     = (x=zeros(nv.x, nc.y), y=zeros(nc.x, nv.y))
-    Pt    = zeros(nc...)
-    Pf    = zeros(nc...)
-    # Materials
-    k_ηf = (x=k_ηf0*ones(nv.x, nc.y), y=k_ηf0*ones(nc.x, nv.y))
-    ηs   = (c=ηs0*ones(nc...), v=ηs0*ones(nv...))
-    ηϕ   = ηϕ0*ones(nc...)
-
-    off   = [nv.x*nc.y, nv.x*nc.y+nc.x*nv.y, nv.x*nc.y+nc.x*nv.y+nc.x*nc.y, nv.x*nc.y+nc.x*nv.y+2*nc.x*nc.y]
-    Num   = (Vx=reshape(1:nv.x*nc.y, nv.x, nc.y) , Vy=reshape(off[1]+1:off[1]+nc.x*nv.y, nc.x, nv.y), 
-             Pt=reshape(off[2]+1:off[2]+nc.x*nc.y,nc...), Pf=reshape(off[3]+1:off[3]+nc.x*nc.y,nc...) )
-    ndof = maximum(off)
-    K    = ExtendableSparseMatrix(ndof, ndof)
-    F    = zeros(ndof)
-
-    dx = Δ.x
-    dy = Δ.y
+function Assembly( ηs, ηϕ, k_ηf, BC, Num, nv, nc, Δ )
+    # Linear system of equation
+    ndof   = maximum(Num.Pf)
+    K      = ExtendableSparseMatrix(ndof, ndof)
+    dx, dy = Δ.x, Δ.y
 
     #############################
     # Total momentum equation x #
@@ -78,7 +46,7 @@ function main()
             #------------------#
             K[ii,iS]  = -eS .* (-DirS - NeuS + 1) ./ dy .^ 2
             K[ii,iW]  = -4 // 3 * eW ./ dx .^ 2
-            K[ii,iC]  = (3 * dx .^ 2 .* (-eN .* (2 * DirN .* dy + DirN + NeuN - 1) + eS .* (2 * DirS .* dy - DirS - NeuS + 1)) + 4 * dy .^ 2 .* (eE + eW)) ./ (3 * dx .^ 2 .* dy .^ 2)
+            K[ii,iC]  = -(2 * eN .* (-DirN ./ dy - (-DirN - NeuN + 1) ./ (2 * dy)) - 2 * eS .* (DirS ./ dy + (-DirS - NeuS + 1) ./ (2 * dy))) ./ dy - (-4 // 3 * eE ./ dx - 4 // 3 * eW ./ dx) ./ dx
             K[ii,iE]  = -4 // 3 * eE ./ dx .^ 2
             K[ii,iN]  = -eN .* (-DirN - NeuN + 1) ./ dy .^ 2
             K[ii,iSW] = -eS ./ (dx .* dy) + (2 // 3) * eW ./ (dx .* dy)
@@ -96,8 +64,7 @@ function main()
     for i=1:nc.x, j=1:nv.y
         if j==1 || j==nv.y
             ii = Num.Vy[i,j]
-            jj = ii
-            K[ii,jj] = 1.0
+            K[ii,ii] = 1.0
         else
             # Equation number
             ii = Num.Vy[i,j]
@@ -110,8 +77,8 @@ function main()
             #------------------#
             iSW = Num.Vx[i,j-1]
             iSE = iSW + 1
-            iNW = iSW + nc.x
-            iNE = iSW + nc.x + 1
+            iNW = iSW + nv.x     
+            iNE = iSW + nv.x + 1
             #------------------#
             iPS = Num.Pt[i,j-1]
             iPN = Num.Pt[i,j]
@@ -130,21 +97,21 @@ function main()
             eN   = ηs.c[i,j]            
             #------------------#
             K[ii,iS]  = -4 // 3 * eS ./ dy .^ 2
-            K[ii,iW]  = -eW .* (-DirW - NeuW + 1) ./ (dx .* dy)
-            K[ii,iC]  = ((4 // 3) * dx .* (eN + eS) + dy .* (-eE .* (2 * DirE .* dy + DirE + NeuE - 1) + eW .* (2 * DirW .* dy - DirW - NeuW + 1))) ./ (dx .* dy .^ 2) - -eE .* (-DirE - NeuE + 1) ./ (dx .* dy)
-            K[ii,iE]  = -eE .* (-DirE - NeuE + 1) ./ (dx .* dy)
+            K[ii,iW]  = -eW .* (-DirW - NeuW + 1) ./ dx .^ 2
+            K[ii,iC]  = -(-4 // 3 * eN ./ dy - 4 // 3 * eS ./ dy) ./ dy - (2 * eE .* (-DirE ./ dx - (-DirE - NeuE + 1) ./ (2 * dx)) - 2 * eW .* (DirW ./ dx + (-DirW - NeuW + 1) ./ (2 * dx))) ./ dx
+            K[ii,iE]  = -eE .* (-DirE - NeuE + 1) ./ dx .^ 2
             K[ii,iN]  = -4 // 3 * eN ./ dy .^ 2
             K[ii,iSW] = (2 // 3) * eS ./ (dx .* dy) - eW ./ (dx .* dy)
             K[ii,iSE] = eE ./ (dx .* dy) - 2 // 3 * eS ./ (dx .* dy)
             K[ii,iNW] = -2 // 3 * eN ./ (dx .* dy) + eW ./ (dx .* dy)
             K[ii,iNE] = -eE ./ (dx .* dy) + (2 // 3) * eN ./ (dx .* dy)
-            K[ii,iPS] = -1 ./ dx
-            K[ii,iPN] = 1 ./ dx         
-        end       
+            K[ii,iPS] = -1 ./ dy
+            K[ii,iPN] = 1 ./ dy     
+        end    
     end
 
     #############################
-    # Total continuity equation #
+    # Solid continuity equation #
     #############################
     for i=1:nc.x, j=1:nc.y
         # Equation number
@@ -162,6 +129,8 @@ function main()
         K[ii,iE] = 1 ./ dx
         K[ii,iS] = -1 ./ dy 
         K[ii,iN] = 1 ./ dy
+        iPf = Num.Pf[i,j]
+        K[ii,iPf] = -1 ./ e_phi
     end
 
     #############################
@@ -200,18 +169,5 @@ function main()
         iPf = Num.Pt[i,j]
         K[ii,iPf] = -1. /e_phi
     end
-
-    flush!(K)
-
-    δx = -K\F
-
-    V.x .+= δx[Num.Vx]
-    V.y .+= δx[Num.Vy]
-    Pt  .+= δx[Num.Pt]
-    Pf  .+= δx[Num.Pf]
-
-    spy(K)
-
+    return flush!(K)
 end
-
-main()
