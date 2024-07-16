@@ -6,6 +6,6 @@ include("Assembly.jl")
 export Assembly
 
 include("Residuals.jl")
-export Residuals!
+export Residuals!, ResidualsNonLinear!
 
 end # module TwoPhasesPressure

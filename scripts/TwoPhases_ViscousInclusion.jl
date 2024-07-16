@@ -8,7 +8,7 @@ function main()
 
     ηs0   = 1.0
     k_ηf0 = 100.0
-    ηϕ0   = 1000.
+    ηb0   = 1000.
 
     xlim = (min=-0.5, max=0.5)
     ylim = (min=-0.5, max=0.5)
@@ -38,7 +38,7 @@ function main()
     # Materials
     k_ηf = (x=k_ηf0*ones(nv.x, nc.y), y=k_ηf0*ones(nc.x, nv.y))
     ηs   = (c=ηs0*ones(nc...), v=ηs0*ones(nv...))
-    ηϕ   = ηϕ0*ones(nc...)
+    ηb   = ηb0*ones(nc...)
 
     # Initial condition
     r   = 0.2
@@ -109,7 +109,7 @@ function main()
 
     # Initial residuals
     F      = zeros(maximum(Num.Pf))
-    Residuals!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηϕ, k_ηf, Δ, BC, VxBC, VyBC  )    
+    Residuals!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, k_ηf, Δ, BC, VxBC, VyBC  )    
     
     F[Num.Vx] = Fm.x[:]
     F[Num.Vy] = Fm.y[:]
@@ -117,7 +117,7 @@ function main()
     F[Num.Pf] = FPf[:]
 
     # Assembly of linear system
-    K = Assembly( ηs, ηϕ, k_ηf, BC, Num, nv, nc, Δ )
+    K = Assembly( ηs, ηb, k_ηf, BC, Num, nv, nc, Δ )
     
     # Solution of linear system
     δx = -K\F
@@ -129,7 +129,7 @@ function main()
     Pf             .+= δx[Num.Pf]
 
     # Final residuals
-    Residuals!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηϕ, k_ηf, Δ, BC, VxBC, VyBC )
+    Residuals!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, k_ηf, Δ, BC, VxBC, VyBC )
 
     # Visualisation
     p1 = Plots.heatmap(x.c, y.c, Pt', title = "Numerics")

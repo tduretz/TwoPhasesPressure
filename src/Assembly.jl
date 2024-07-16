@@ -1,4 +1,4 @@
-function Assembly( ηs, ηϕ, k_ηf, BC, Num, nv, nc, Δ )
+function Assembly( ηs, ηb, k_ηf, BC, Num, nv, nc, Δ )
     # Linear system of equation
     ndof   = maximum(Num.Pf)
     K      = ExtendableSparseMatrix(ndof, ndof)
@@ -122,7 +122,7 @@ function Assembly( ηs, ηϕ, k_ηf, BC, Num, nv, nc, Δ )
         iS = Num.Vy[i,j]
         iN = Num.Vy[i,j+1]
         # Material coefficient
-        e_phi = ηϕ[i,j]
+        e_phi = ηb[i,j]
         # Linear system coefficients
         K[ii,ii] = 1 ./ e_phi
         K[ii,iW] = -1 ./ dx
@@ -159,7 +159,7 @@ function Assembly( ηs, ηϕ, k_ηf, BC, Num, nv, nc, Δ )
         k_ef_E = k_ηf.x[i+1,j]
         k_ef_S = k_ηf.y[i,j]
         k_ef_N = k_ηf.y[i,j+1]
-        e_phi  = ηϕ[i,j]
+        e_phi  = ηb[i,j]
         # Linear system coefficients
         K[ii,iS] = -k_ef_S .* (1 - BCPfS) ./ dy .^ 2
         K[ii,iW] = -k_ef_W .* (1 - BCPfW) ./ dx .^ 2

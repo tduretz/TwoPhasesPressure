@@ -10,7 +10,7 @@ function main()
    
     ηs0   = 1.0
     k_ηf0 = 0.001
-    ηϕ0   = 1
+    ηb0   = 1
     len   = 1e0
     xlim = (min=-len/2, max=len/2)
     ylim = (min=-len/2, max=len/2)
@@ -41,7 +41,7 @@ function main()
     # Materials
     k_ηf = (x=k_ηf0*ones(nv.x, nc.y), y=k_ηf0*ones(nc.x, nv.y))
     ηs   = (c=ηs0*ones(nc...), v=ηs0*ones(nv...))
-    ηϕ   = ηϕ0*ones(nc...)
+    ηb   = ηb0*ones(nc...)
 
     # Initial condition
     @. ηs.v[x.v^2 + (y.v.^2)'<r^2] = 10 * ηs0
@@ -71,7 +71,7 @@ function main()
 
     # Initial residuals
     F      = zeros(maximum(Num.Pf))
-    Residuals!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηϕ, k_ηf, Δ, BC, VxBC, VyBC  )    
+    Residuals!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, k_ηf, Δ, BC, VxBC, VyBC  )    
     
     F[Num.Vx] = Fm.x[:]
     F[Num.Vy] = Fm.y[:]
@@ -79,7 +79,7 @@ function main()
     F[Num.Pf] = FPf[:]
 
     # Assembly of linear system
-    K = Assembly( ηs, ηϕ, k_ηf, BC, Num, nv, nc, Δ )
+    K = Assembly( ηs, ηb, k_ηf, BC, Num, nv, nc, Δ )
     
     # Solution of linear system
     δx = -K\F
@@ -91,14 +91,14 @@ function main()
     Pf             .+= δx[Num.Pf]
 
     # Final residuals
-    Residuals!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηϕ, k_ηf, Δ, BC, VxBC, VyBC )
+    Residuals!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, k_ηf, Δ, BC, VxBC, VyBC )
 
     # Visualisation
     ε̇xy_c = 0.25*(ε̇.xy[1:end-1,1:end-1] + ε̇.xy[2:end-0,1:end-1] + ε̇.xy[1:end-1,2:end-0] + ε̇.xy[2:end-0,2:end-0]) 
     ε̇II   = sqrt.( 0.5*ε̇.xx.^2 + 0.5*ε̇.yy.^2 + ε̇xy_c.^2 )
     τxy_c = 0.25*(τ.xy[1:end-1,1:end-1] + τ.xy[2:end-0,1:end-1] + τ.xy[1:end-1,2:end-0] + τ.xy[2:end-0,2:end-0]) 
     τII   = sqrt.( 0.5*τ.xx.^2 + 0.5*τ.yy.^2 + τxy_c.^2 )
-    lc    = sqrt.(k_ηf0 * (ηϕ0 + 4/3 * ηs0))
+    lc    = sqrt.(k_ηf0 * (ηb0 + 4/3 * ηs0))
     println("Compaction length: ",lc)
     p1 = Plots.heatmap(x.v, y.c, V.x[:,2:end-1]', title="Vx")
     p2 = Plots.heatmap(x.c, y.v, V.y[2:end-1,:]', title="Vy")
