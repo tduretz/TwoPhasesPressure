@@ -1,3 +1,7 @@
+###########################################################################################################
+# v2: Non-linearity of ϕ (function ResidualsNonLinear!)
+###########################################################################################################
+
 using TwoPhasesPressure
 using LinearAlgebra, ExtendableSparse, Printf
 
@@ -8,14 +12,15 @@ import Plots
 
 function main()
     # Adimensionnal numbers
-    Ωl     = 10^0        # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
-    Ωη     = 10^-4       # Ratio ηb / ηs
+    Ωl     = 10^-2       # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
+    Ωη     = 10^-2         # Ratio ηb / ηs
     ηs_ηs0 = 10         # Ratio (inclusion viscosity) / (matrix viscosity)
     # Independant
     ηs0    = 1          # Shear viscosity
     len    = 1          # Box size
     ε̇bg    = 1          # Background strain rate
     ϕ0     = 0.01
+    dt     = 1e-4
     # Dependant
     ηb0    = Ωη * ηs0   # Bulk viscosity
     k_ηf0  = (len.^2 * Ωl^2) / (ηb0 + 4/3 * ηs0) # Permeability / fluid viscosity
@@ -51,12 +56,14 @@ function main()
     ηs   = (c=ηs0*ones(nc...), v=ηs0*ones(nv...))
     ηb   = ηb0*ones(nc...)
     ϕ     = (c=zeros(nc.x, nc.y), x=zeros(nv.x-2, nc.y), y =zeros(nc.x, nv.y-2))
-
+    
     # Initial condition
     @. ηs.v[x.v^2 + (y.v.^2)'<r^2] = ηs_ηs0 .* ηs0
-    @. ηs.c = 0.25*(ηs.v[1:end-1,1:end-1] + ηs.v[2:end-0,1:end-1] + ηs.v[1:end-1,2:end-0] + ηs.v[2:end-0,2:end-0])
-    @. ϕ.c   = ϕ0
-    
+    @. ηs.c  = 0.25*(ηs.v[1:end-1,1:end-1] + ηs.v[2:end-0,1:end-1] + ηs.v[1:end-1,2:end-0] + ηs.v[2:end-0,2:end-0])
+    @. ϕ.c  = ϕ0
+    ϕold    = copy(ϕ.c)
+    lϕ      = log.(1 .- ϕ.c)
+
     # Pure shear
     BC   = (W=:Neumann, E=:Neumann, S=:Neumann, N=:Neumann)
     VxBC = (S=zeros(nv.x), N=zeros(nv.x))
@@ -78,19 +85,32 @@ function main()
 
     # Initial residuals
     F      = zeros(maximum(Num.Pf))
-
+    p0     = Plots.scatter([], [], title="Residuals", xlabel = "Total iterations", ylabel = "log10 Error", label="Vx", legend=:topleft, color=:black)
+    Plots.scatter!(p0, [], [], label="Vy", color=:red)
+    Plots.scatter!(p0, [], [], label="Pt", color=:green)
+    Plots.scatter!(p0, [], [], label="Pf", color=:blue)
     # Time loop
-    dt = 1e-4
-    ϕold = copy(ϕ.c)
-    for it = 1:10
-        
-        # Residuals!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, k_ηf, Δ, BC, VxBC, VyBC)    
-        ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, dt  )    
-        
+    for it = 1:2000
+        ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, dt, lϕ  )    
         F[Num.Vx] = Fm.x[:]
         F[Num.Vy] = Fm.y[:]
         F[Num.Pt] = FPt[:]
         F[Num.Pf] = FPf[:]
+
+        # Visualisation of residuals
+        if it%10  == 0
+            @printf("Residuals:\n")
+            @printf("Fmx = %1.4e\n", norm(Fm.x)/length(Fm.x))
+            @printf("Fmy = %1.4e\n", norm(Fm.y)/length(Fm.y))
+            @printf("Fpt = %1.4e\n", norm(FPt)/length(FPt))
+            @printf("Fpf = %1.4e\n", norm(FPf)/length(FPf))
+            res = (Vx = log10(norm(Fm.x)/length(Fm.x)), Vy = log10(norm(Fm.y)/length(Fm.y)), Pt = log10(norm(FPt)/length(FPt)), Pf = log10(norm(FPf)/length(FPf)))
+            Plots.scatter!(p0, [it], [res.Vx], label=false, color=:black)
+            Plots.scatter!(p0, [it], [res.Vy], label=false, color=:red)
+            Plots.scatter!(p0, [it], [res.Pt], label=false, color=:green)
+            Plots.scatter!(p0, [it], [res.Pf], label=false, color=:blue)
+            display(p0)
+        end
 
         # Assembly of linear system
         K = Assembly( ηs, ηb, k_ηf, BC, Num, nv, nc, Δ )
@@ -106,7 +126,7 @@ function main()
     end # End time loop
 
     # Final residuals
-    ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, dt  )    
+    ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, dt, lϕ  )    
 
     # Visualisation
     ε̇xy_c = 0.25*(ε̇.xy[1:end-1,1:end-1] + ε̇.xy[2:end-0,1:end-1] + ε̇.xy[1:end-1,2:end-0] + ε̇.xy[2:end-0,2:end-0]) 
