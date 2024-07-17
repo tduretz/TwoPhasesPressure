@@ -2,7 +2,6 @@ using TwoPhasesPressure
 using LinearAlgebra, ExtendableSparse, Printf, ExactFieldSolutions
 
 import Plots
-gr()
 
 function main()
 
