@@ -10,17 +10,17 @@ function main()
     # Dimensionaless numbers
     Ωl     = 10^2       # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
     Ωη     = 10^-4      # Ratio ηb / ηs
-    ηs_ηs0 = 10         # Ratio (inclusion viscosity) / (matrix viscosity)
+    ηs_ηs0 = 10.0       # Ratio (inclusion viscosity) / (matrix viscosity)
     # Independent
-    ηs0    = 1          # Shear viscosity
-    len    = 1          # Box size
-    ε̇bg    = 1          # Background strain rate
+    ηs0    = 1.0        # Shear viscosity
+    len    = 1.0        # Box size
+    ε̇bg    = 1.0        # Background strain rate
     ϕ0     = 0.01
     nϕ     = 3.0
     # Dependent
     ηb0    = Ωη * ηs0   # Bulk viscosity
     k_ηf0  = (len.^2 * Ωl^2) / (ηb0 + 4/3 * ηs0) # Permeability / fluid viscosity
-    r      = len/10     # Inclusion radius
+    r      = len/10.0   # Inclusion radius
 
     xlim = (min=-len/2, max=len/2)
     ylim = (min=-len/2, max=len/2)
@@ -48,11 +48,12 @@ function main()
     divVs = zeros(nc.x, nc.y)
     divqD = zeros(nc.x, nc.y)
     # Materials
-    k_ηf = (x=k_ηf0*ones(nv.x, nc.y), y=k_ηf0*ones(nc.x, nv.y))
-    ηs   = (c=ηs0*ones(nc...), v=ηs0*ones(nv...))
-    ηb   = ηb0*ones(nc...)
-    ηϕ   = ηb0*ones(nc...)
+    k_ηf  = (x=k_ηf0*ones(nv.x, nc.y), y=k_ηf0*ones(nc.x, nv.y))
+    ηs    = (c=ηs0*ones(nc...), v=ηs0*ones(nv...))
+    ηb    = ηb0*ones(nc...)
+    ηϕ    = ηb0*ones(nc...)
     ϕ     = (c=zeros(nc.x, nc.y), x=zeros(nv.x-2, nc.y), y =zeros(nc.x, nv.y-2))
+    lϕold = zeros(nc...)
 
     # Initial condition
     @. ηs.v[x.v^2 + (y.v.^2)'<r^2] = ηs_ηs0 .* ηs0
@@ -83,10 +84,11 @@ function main()
 
     # Time loop
     dt = 1e-4
-    ϕold = copy(ϕ.c)
+    @. lϕold = log(1.0 - (ϕ.c))
+    
     for it = 1:10
         
-        ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt  )    
+        ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, lϕold, k_ηf0, nϕ, dt  )    
         
         if (norm(Fm.x)/length(Fm.x)<1e-10 && norm(FPf)/length(FPf)<1e-10 && norm(FPt)/length(FPt)<1e-10) break end
         F[Num.Vx] = Fm.x[:]
@@ -108,7 +110,7 @@ function main()
     end # End time loop
 
     # Final residuals
-    ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt  )
+    ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, lϕold, k_ηf0, nϕ, dt  )
 
     # Visualisation
     ε̇xy_c = 0.25*(ε̇.xy[1:end-1,1:end-1] + ε̇.xy[2:end-0,1:end-1] + ε̇.xy[1:end-1,2:end-0] + ε̇.xy[2:end-0,2:end-0]) 
