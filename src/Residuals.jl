@@ -24,13 +24,13 @@ function Residuals!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, η
     @printf("Fpf = %1.4e\n", norm(FPf)/length(FPf))
 end
 
-function ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, lϕold, k_ηf0, nϕ, dt  )
+function ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt  )
     @. V.x[:,1]   = (BC.S==:Neumann)*V.x[:,2]     + (BC.S==:Dirichlet)*(2*VxBC.S - V.x[:,2])
     @. V.x[:,end] = (BC.N==:Neumann)*V.x[:,end-1] + (BC.N==:Dirichlet)*(2*VxBC.N - V.x[:,end-1])
     @. V.y[1,:]   = (BC.W==:Neumann)*V.y[2,:]     + (BC.W==:Dirichlet)*(2*VyBC.W - V.y[2,:])
     @. V.y[end,:] = (BC.E==:Neumann)*V.y[end-1,:] + (BC.E==:Dirichlet)*(2*VyBC.E - V.y[end-1,:])
     @. divVs = (V.x[2:end,2:end-1] - V.x[1:end-1,2:end-1])/Δ.x + (V.y[2:end-1,2:end] - V.y[2:end-1,1:end-1])/Δ.y
-    @. ϕ.c   = 1 - exp(lϕold - divVs * dt)
+    @. ϕ.c   = 1 - exp(log(1.0 - ϕold)  - divVs * dt)
     @. ϕ.x   = (ϕ.c[2:end,:] + ϕ.c[1:end-1,:]) / 2.0
     @. ϕ.y   = (ϕ.c[:,2:end] + ϕ.c[:,1:end-1]) / 2.0
     @. ε̇.xx  = (V.x[2:end,2:end-1] - V.x[1:end-1,2:end-1])/Δ.x - 1.0/3.0*divVs
@@ -39,7 +39,7 @@ function ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD
     @. τ.xx  = 2.0*ηs.c*ε̇.xx
     @. τ.yy  = 2.0*ηs.c*ε̇.yy
     @. τ.xy  = 2.0*ηs.v*ε̇.xy
-    @. k_ηf.x[2:end-1,:] = k_ηf0 * ϕ.x^nϕ     # ACHTUNG: Store non linear coefficient (to be reused in matrix assembly for Picard linearisation)
+    @. k_ηf.x[2:end-1,:] = k_ηf0 * ϕ.x^nϕ    # ACHTUNG: Store non linear coefficient (to be reused in matrix assembly for Picard linearisation)
     @. k_ηf.y[:,2:end-1] = k_ηf0 * ϕ.y^nϕ
     @. qD.x[2:end-1,:]   = - k_ηf.x[2:end-1,:] * (Pf[2:end,:]-Pf[1:end-1,:])/Δ.x
     @. qD.y[:,2:end-1]   = - k_ηf.y[:,2:end-1] * (Pf[:,2:end]-Pf[:,1:end-1])/Δ.y
@@ -49,9 +49,4 @@ function ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD
     @. ηϕ              = (1.0 - ϕ.c) * ηb     # ACHTUNG: Store non linear coefficient (to be rsused in matrix assembly for Picard linearisation)
     @. FPt             = divVs + (Pt-Pf)/ηϕ 
     @. FPf             = divqD - (Pt-Pf)/ηϕ
-    @printf("Residuals:\n")
-    @printf("Fmx = %1.4e\n", norm(Fm.x)/length(Fm.x))
-    @printf("Fmy = %1.4e\n", norm(Fm.y)/length(Fm.y))
-    @printf("Fpt = %1.4e\n", norm(FPt)/length(FPt))
-    @printf("Fpf = %1.4e\n", norm(FPf)/length(FPf))
 end

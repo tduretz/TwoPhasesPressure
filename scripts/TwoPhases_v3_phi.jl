@@ -8,18 +8,22 @@ function main()
     # k_ηf0 = f(Ωl, nϕ, k_ηf_ref)
 
     # Dimensionaless numbers
-    Ωl     = 10^2       # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
-    Ωη     = 10^-4      # Ratio ηb / ηs
+    Ωl     = 10^-1       # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
+    Ωη     = 10^-1      # Ratio ηb / ηs
     ηs_ηs0 = 10.0       # Ratio (inclusion viscosity) / (matrix viscosity)
     # Independent
     ηs0    = 1.0        # Shear viscosity
     len    = 1.0        # Box size
-    ε̇bg    = 1.0        # Background strain rate
+    ε̇bg    = 1          # Background strain rate
     ϕ0     = 0.01
+    ϕref   = 0.01       # Reference porosity for which k_ηf_0 is a reference permeability
     nϕ     = 3.0
+    dt     = 1e-5
     # Dependent
     ηb0    = Ωη * ηs0   # Bulk viscosity
-    k_ηf0  = (len.^2 * Ωl^2) / (ηb0 + 4/3 * ηs0) # Permeability / fluid viscosity
+    k_ηf0  = (len.^2 * Ωl^2) / (ηb0 + 4/3 * ηs0) / ϕref^nϕ   # Permeability / fluid viscosity 
+    k_ηf_ref = k_ηf0*ϕ0^nϕ
+    print(k_ηf_ref, "\n")
     r      = len/10.0   # Inclusion radius
 
     xlim = (min=-len/2, max=len/2)
@@ -53,7 +57,7 @@ function main()
     ηb    = ηb0*ones(nc...)
     ηϕ    = ηb0*ones(nc...)
     ϕ     = (c=zeros(nc.x, nc.y), x=zeros(nv.x-2, nc.y), y =zeros(nc.x, nv.y-2))
-    lϕold = zeros(nc...)
+    ϕold  = zeros(nc...)
 
     # Initial condition
     @. ηs.v[x.v^2 + (y.v.^2)'<r^2] = ηs_ηs0 .* ηs0
@@ -83,14 +87,11 @@ function main()
     F      = zeros(maximum(Num.Pf))
 
     # Time loop
-    dt = 1e-4
-    @. lϕold = log(1.0 - (ϕ.c))
-    
-    for it = 1:10
+    @. ϕold = copy(ϕ.c)
+    for it = 1:1000
         
-        ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, lϕold, k_ηf0, nϕ, dt  )    
-        
-        if (norm(Fm.x)/length(Fm.x)<1e-10 && norm(FPf)/length(FPf)<1e-10 && norm(FPt)/length(FPt)<1e-10) break end
+        ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt  )    
+        # if (norm(Fm.x)/length(Fm.x)<1e-10 && norm(FPf)/length(FPf)<1e-10 && norm(FPt)/length(FPt)<1e-10) break end
         F[Num.Vx] = Fm.x[:]
         F[Num.Vy] = Fm.y[:]
         F[Num.Pt] = FPt[:]
@@ -98,19 +99,17 @@ function main()
 
         # Assembly of linear system
         K = Assembly( ηs, ηϕ, k_ηf, BC, Num, nv, nc, Δ )
-        
         # Solution of linear system
         δx = -K\F
-
         # Correct solution fields
         V.x[:,2:end-1] .+= δx[Num.Vx]
         V.y[2:end-1,:] .+= δx[Num.Vy]
         Pt             .+= δx[Num.Pt]
         Pf             .+= δx[Num.Pf]
-    end # End time loop
+    end # End iteration loop
 
     # Final residuals
-    ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, lϕold, k_ηf0, nϕ, dt  )
+    ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt )
 
     # Visualisation
     ε̇xy_c = 0.25*(ε̇.xy[1:end-1,1:end-1] + ε̇.xy[2:end-0,1:end-1] + ε̇.xy[1:end-1,2:end-0] + ε̇.xy[2:end-0,2:end-0]) 
@@ -118,8 +117,6 @@ function main()
     τxy_c = 0.25*(τ.xy[1:end-1,1:end-1] + τ.xy[2:end-0,1:end-1] + τ.xy[1:end-1,2:end-0] + τ.xy[2:end-0,2:end-0]) 
     τII   = sqrt.( 0.5*τ.xx.^2 + 0.5*τ.yy.^2 + τxy_c.^2 )
     lc    = sqrt.(k_ηf0 * (ηb0 + 4/3 * ηs0))
-    println("Compaction length ratio: ",lc/len)
-    println("ηs0 / ηb0: ", ηs0 / ηb0)
     p1 = Plots.heatmap(x.v, y.c, V.x[:,2:end-1]', title="Vx")
     p2 = Plots.heatmap(x.c, y.v, V.y[2:end-1,:]', title="Vy")
     p3 = Plots.heatmap(x.c, y.c, ε̇II', title="ε̇II")
@@ -130,15 +127,6 @@ function main()
     p8 = Plots.heatmap(x.c, y.c, divqD', title="divqD")
     p9 = Plots.heatmap(x.c, y.c, ϕ.c', title="ϕ")
     display(Plots.plot(p1, p2, p3, p4, p5, p6, p7, p8, p9))
-
-    # f   = Figure(size = (500, 500), fontsize=25)
-    # ax1 = Axis(f[1, 1], title = L"P", xlabel = L"$x$ [m]", ylabel = L"$y$ [m]")
-    # hm  = heatmap!(ax1, x.c, y.c, Pt', colormap = :turbo)
-    # colsize!(f.layout, 1, Aspect(1, 1.0))
-    # Colorbar(f[1, 2], hm, label = "Phases", width = 20, labelsize = 25, ticklabelsize = 14 )
-    # DataInspector(f) 
-    # display(f)
-
 end
 
 @time main()
