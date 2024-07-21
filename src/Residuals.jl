@@ -17,11 +17,6 @@ function Residuals!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, η
     @. Fm.y[:,2:end-1] = - ((τ.yy[:,2:end-0]-τ.yy[:,1:end-1])/Δ.y + (τ.xy[2:end,2:end-1]-τ.xy[1:end-1,2:end-1])/Δ.x - (Pt[:,2:end]-Pt[:,1:end-1])/Δ.y)
     @. FPt             = divVs + (Pt-Pf)/ηb 
     @. FPf             = divqD - (Pt-Pf)/ηb 
-    @printf("Residuals:\n")
-    @printf("Fmx = %1.4e\n", norm(Fm.x)/length(Fm.x))
-    @printf("Fmy = %1.4e\n", norm(Fm.y)/length(Fm.y))
-    @printf("Fpt = %1.4e\n", norm(FPt)/length(FPt))
-    @printf("Fpf = %1.4e\n", norm(FPf)/length(FPf))
 end
 
 function ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt  )
@@ -30,7 +25,7 @@ function ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD
     @. V.y[1,:]   = (BC.W==:Neumann)*V.y[2,:]     + (BC.W==:Dirichlet)*(2*VyBC.W - V.y[2,:])
     @. V.y[end,:] = (BC.E==:Neumann)*V.y[end-1,:] + (BC.E==:Dirichlet)*(2*VyBC.E - V.y[end-1,:])
     @. divVs = (V.x[2:end,2:end-1] - V.x[1:end-1,2:end-1])/Δ.x + (V.y[2:end-1,2:end] - V.y[2:end-1,1:end-1])/Δ.y
-    @. ϕ.c   = 1 - exp(log(1.0 - ϕold)  - divVs * dt)
+    @. ϕ.c   = 1.0 - exp(log(1.0 - ϕold)  - divVs * dt)
     @. ϕ.x   = (ϕ.c[2:end,:] + ϕ.c[1:end-1,:]) / 2.0
     @. ϕ.y   = (ϕ.c[:,2:end] + ϕ.c[:,1:end-1]) / 2.0
     @. ε̇.xx  = (V.x[2:end,2:end-1] - V.x[1:end-1,2:end-1])/Δ.x - 1.0/3.0*divVs
