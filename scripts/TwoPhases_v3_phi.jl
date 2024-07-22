@@ -1,5 +1,6 @@
 using TwoPhasesPressure
 using LinearAlgebra, ExtendableSparse, Printf
+import Statistics: mean
 import Plots
 
 function main()
@@ -8,12 +9,12 @@ function main()
     # k_ηf0 = f(Ωl, nϕ, k_ηf_ref)
 
     # Dimensionaless numbers
-    Ωl     = 10^-1       # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
+    Ωl     = 10^-1      # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
     Ωη     = 10^-1      # Ratio ηb / ηs
     ηs_ηs0 = 10.0       # Ratio (inclusion viscosity) / (matrix viscosity)
     # Independent
     ηs0    = 1.0        # Shear viscosity
-    len    = 1.0        # Box size
+    len    = 10.0       # Box size
     ε̇bg    = 1          # Background strain rate
     ϕ0     = 0.01
     ϕref   = 0.01       # Reference porosity for which k_ηf_0 is a reference permeability
@@ -28,7 +29,7 @@ function main()
 
     xlim = (min=-len/2, max=len/2)
     ylim = (min=-len/2, max=len/2)
-    nc   = (x=100, y=100)
+    nc   = (x=50, y=50)
     nv   = (x=nc.x+1, y=nc.y+1)
     nc   = (x=nc.x+0, y=nc.y+0)
     nv   = (x=nv.x+0, y=nv.y+0)
@@ -38,9 +39,10 @@ function main()
 
     # Primitive variables
     V     = (x=zeros(nv.x, nc.y+2), y=zeros(nc.x+2, nv.y))
-    Pt    = zeros(nc...)
+    Pt    =  ones(nc...)
     Pf    = zeros(nc...)
     # Residuals
+    ϵ     = 1e-11
     Fm    = (x=zeros(nv.x, nc.y), y=zeros(nc.x, nv.y))
     FPt   = zeros(nc...)
     FPf   = zeros(nc...) 
@@ -48,7 +50,6 @@ function main()
     ε̇     = (xx=zeros(nc.x, nc.y), yy=zeros(nc.x, nc.y), xy=zeros(nv.x, nv.y))
     τ     = (xx=zeros(nc.x, nc.y), yy=zeros(nc.x, nc.y), xy=zeros(nv.x, nv.y))
     qD    = (x =zeros(nv.x, nc.y), y =zeros(nc.x, nv.y))
-    
     divVs = zeros(nc.x, nc.y)
     divqD = zeros(nc.x, nc.y)
     # Materials
@@ -84,14 +85,24 @@ function main()
               Pt=reshape(off[2]+1:off[2]+nc.x*nc.y,nc...), Pf=reshape(off[3]+1:off[3]+nc.x*nc.y,nc...) )
 
     # Initial residuals
-    F      = zeros(maximum(Num.Pf))
+    F       = zeros(maximum(Num.Pf))
+    nF, nF0 = zeros(4), zeros(4)
 
     # Time loop
     @. ϕold = copy(ϕ.c)
     for it = 1:1000
         
-        ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt  )    
-        # if (norm(Fm.x)/length(Fm.x)<1e-10 && norm(FPf)/length(FPf)<1e-10 && norm(FPt)/length(FPt)<1e-10) break end
+        ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt  )   
+        @printf("### Iteration %03d\n", it)
+        nF .= [norm(Fm.x)/length(Fm.x); norm(Fm.y)/length(Fm.y); norm(FPt)/length(FPt); norm(FPf)/length(FPf)]
+        if it==1 nF0 .= nF end
+        @printf("Fmx: abs = %1.4e --- rel = %1.4e \n", nF[1], nF[1]./nF0[1])
+        @printf("Fmy: abs = %1.4e --- rel = %1.4e \n", nF[2], nF[2]./nF0[2])
+        @printf("Fpt: abs = %1.4e --- rel = %1.4e \n", nF[3], nF[3]./nF0[3])
+        @printf("Fpf: abs = %1.4e --- rel = %1.4e \n", nF[4], nF[4]./nF0[4]) 
+        rel_tol = maximum(nF     ) < ϵ
+        abs_tol = maximum(nF./nF0) < ϵ
+        if (abs_tol || rel_tol) break end
         F[Num.Vx] = Fm.x[:]
         F[Num.Vy] = Fm.y[:]
         F[Num.Pt] = FPt[:]
@@ -107,6 +118,8 @@ function main()
         Pt             .+= δx[Num.Pt]
         Pf             .+= δx[Num.Pf]
     end # End iteration loop
+    @show mean(Pt)
+    @show mean(Pf)
 
     # Final residuals
     ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt )
@@ -119,13 +132,13 @@ function main()
     lc    = sqrt.(k_ηf0 * (ηb0 + 4/3 * ηs0))
     p1 = Plots.heatmap(x.v, y.c, V.x[:,2:end-1]', title="Vx")
     p2 = Plots.heatmap(x.c, y.v, V.y[2:end-1,:]', title="Vy")
-    p3 = Plots.heatmap(x.c, y.c, ε̇II', title="ε̇II")
-    p4 = Plots.heatmap(x.c, y.c, Pt', title="Pt")
-    p5 = Plots.heatmap(x.c, y.c, Pf', title="Pf")
-    p6 = Plots.heatmap(x.c, y.c, τII', title="τII")
-    p7 = Plots.heatmap(x.c, y.c, divVs', title="divVs")
-    p8 = Plots.heatmap(x.c, y.c, divqD', title="divqD")
-    p9 = Plots.heatmap(x.c, y.c, ϕ.c', title="ϕ")
+    p3 = Plots.heatmap(x.c, y.c, ε̇II',            title="ε̇II")
+    p4 = Plots.heatmap(x.c, y.c, Pt,              title="Pt")
+    p5 = Plots.heatmap(x.c, y.c, Pf',             title="Pf")
+    p6 = Plots.heatmap(x.c, y.c, τII',            title="τII")
+    p7 = Plots.heatmap(x.c, y.c, divVs',          title="divVs")
+    p8 = Plots.heatmap(x.c, y.c, divqD',          title="divqD")
+    p9 = Plots.heatmap(x.c, y.c, ϕ.c',            title="ϕ")
     display(Plots.plot(p1, p2, p3, p4, p5, p6, p7, p8, p9))
 end
 

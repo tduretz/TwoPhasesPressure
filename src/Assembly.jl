@@ -36,19 +36,21 @@ function Assembly( ηs, ηb, k_ηf, BC, Num, nv, nc, Δ )
             NeuS = (j==1 && BC.S!=:Dirichlet) 
             DirN = (j==nc.x && BC.N==:Dirichlet) 
             NeuN = (j==nc.x && BC.N!=:Dirichlet)
-            iS   = (j==1)    ? 1 : iS
-            iN   = (j==nc.x) ? 1 : iN
+            # iS   = (j==1)    ? 1 : iS
+            # iN   = (j==nc.x) ? 1 : iN
+            inS   = (j==1)    ? false : true
+            inN   = (j==nc.x) ? false : true
             #------------------#
             eW   = ηs.c[i-1,j]
             eE   = ηs.c[i,j]
             eS   = ηs.v[i,j]
             eN   = ηs.v[i,j+1]
             #------------------#
-            K[ii,iS]  = -eS .* (-DirS - NeuS + 1) ./ dy .^ 2
+            if inS K[ii,iS]  = -eS .* (-DirS - NeuS + 1) ./ dy .^ 2 end
             K[ii,iW]  = -4 // 3 * eW ./ dx .^ 2
             K[ii,iC]  = -(2 * eN .* (-DirN ./ dy - (-DirN - NeuN + 1) ./ (2 * dy)) - 2 * eS .* (DirS ./ dy + (-DirS - NeuS + 1) ./ (2 * dy))) ./ dy - (-4 // 3 * eE ./ dx - 4 // 3 * eW ./ dx) ./ dx
             K[ii,iE]  = -4 // 3 * eE ./ dx .^ 2
-            K[ii,iN]  = -eN .* (-DirN - NeuN + 1) ./ dy .^ 2
+            if inN K[ii,iN]  = -eN .* (-DirN - NeuN + 1) ./ dy .^ 2 end
             K[ii,iSW] = -eS ./ (dx .* dy) + (2 // 3) * eW ./ (dx .* dy)
             K[ii,iSE] = -2 // 3 * eE ./ (dx .* dy) + eS ./ (dx .* dy)
             K[ii,iNW] = eN ./ (dx .* dy) - 2 // 3 * eW ./ (dx .* dy)
@@ -88,8 +90,10 @@ function Assembly( ηs, ηb, k_ηf, BC, Num, nv, nc, Δ )
             NeuW = (i==1 && BC.W!=:Dirichlet) 
             DirE = (i==nc.y && BC.E==:Dirichlet) 
             NeuE = (i==nc.y && BC.E!=:Dirichlet)
-            iW   = (i==1)    ? 1 : iW
-            iE   = (i==nc.y) ? 1 : iE       
+            # iW   = (i==1)    ? 1 : iW
+            # iE   = (i==nc.y) ? 1 : iE       
+            inW   = (i==1)    ? false : true
+            inE   = (i==nc.y) ? false : true   
             #------------------#
             eW   = ηs.v[i,j]
             eE   = ηs.v[i+1,j]
@@ -97,9 +101,9 @@ function Assembly( ηs, ηb, k_ηf, BC, Num, nv, nc, Δ )
             eN   = ηs.c[i,j]            
             #------------------#
             K[ii,iS]  = -4 // 3 * eS ./ dy .^ 2
-            K[ii,iW]  = -eW .* (-DirW - NeuW + 1) ./ dx .^ 2
+            if inW K[ii,iW]  = -eW .* (-DirW - NeuW + 1) ./ dx .^ 2 end
             K[ii,iC]  = -(-4 // 3 * eN ./ dy - 4 // 3 * eS ./ dy) ./ dy - (2 * eE .* (-DirE ./ dx - (-DirE - NeuE + 1) ./ (2 * dx)) - 2 * eW .* (DirW ./ dx + (-DirW - NeuW + 1) ./ (2 * dx))) ./ dx
-            K[ii,iE]  = -eE .* (-DirE - NeuE + 1) ./ dx .^ 2
+            if inE K[ii,iE]  = -eE .* (-DirE - NeuE + 1) ./ dx .^ 2 end
             K[ii,iN]  = -4 // 3 * eN ./ dy .^ 2
             K[ii,iSW] = (2 // 3) * eS ./ (dx .* dy) - eW ./ (dx .* dy)
             K[ii,iSE] = eE ./ (dx .* dy) - 2 // 3 * eS ./ (dx .* dy)
@@ -146,13 +150,17 @@ function Assembly( ηs, ηb, k_ηf, BC, Num, nv, nc, Δ )
         iE = ii + 1
         iN = ii + nc.x
         # Boundaries
-        iW     = i==1    ? 1  : iW   
+        # iW     = i==1    ? 1  : iW   
+        inW     = i==1    ? false : true 
         BCPfW  = i==1    ? 1. : 0.
-        iE     = i==nc.x ? 1  : iE   
+        # iE     = i==nc.x ? 1  : iE 
+        inE     = i==nc.x    ? false : true 
         BCPfE  = i==nc.x ? 1. : 0.
-        iS     = j==1    ? 1  : iS   
+        # iS     = j==1    ? 1  : iS
+        inS    = j==1    ? false : true    
         BCPfS  = j==1    ? 1. : 0.
-        iN     = j==nc.y ? 1  : iN   
+        # iN     = j==nc.y ? 1  : iN   
+        inN    = j==nc.y    ? false : true    
         BCPfN  = j==nc.y ? 1. : 0.
         # Material coefficient
         k_ef_W = k_ηf.x[i,j]
@@ -161,11 +169,11 @@ function Assembly( ηs, ηb, k_ηf, BC, Num, nv, nc, Δ )
         k_ef_N = k_ηf.y[i,j+1]
         e_phi  = ηb[i,j]
         # Linear system coefficients
-        K[ii,iS] = -k_ef_S .* (1 - BCPfS) ./ dy .^ 2
-        K[ii,iW] = -k_ef_W .* (1 - BCPfW) ./ dx .^ 2
+        if inS K[ii,iS] = -k_ef_S .* (1 - BCPfS) ./ dy .^ 2 end
+        if inW K[ii,iW] = -k_ef_W .* (1 - BCPfW) ./ dx .^ 2 end
         K[ii,iC] = (k_ef_N .* (1 - BCPfN) ./ dy + k_ef_S .* (1 - BCPfS) ./ dy) ./ dy + (k_ef_E .* (1 - BCPfE) ./ dx + k_ef_W .* (1 - BCPfW) ./ dx) ./ dx + 1. /e_phi
-        K[ii,iE] = -k_ef_E .* (1 - BCPfE) ./ dx .^ 2
-        K[ii,iN] = -k_ef_N .* (1 - BCPfN) ./ dy .^ 2
+        if inE K[ii,iE] = -k_ef_E .* (1 - BCPfE) ./ dx .^ 2 end
+        if inN K[ii,iN] = -k_ef_N .* (1 - BCPfN) ./ dy .^ 2 end
         iPf = Num.Pt[i,j]
         K[ii,iPf] = -1. /e_phi
     end
