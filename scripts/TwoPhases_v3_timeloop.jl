@@ -9,8 +9,8 @@ function main()
     # k_ηf0 = f(Ωl, nϕ, k_ηf_ref)
 
     # Dimensionaless numbers
-    Ωl     = 10^-1      # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
-    Ωη     = 10^-1      # Ratio ηb / ηs
+    Ωl     = 10^0      # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
+    Ωη     = 10^0      # Ratio ηb / ηs
     ηs_ηs0 = 10.0       # Ratio (inclusion viscosity) / (matrix viscosity)
     # Independent
     ηs0    = 1.0        # Shear viscosity
@@ -19,6 +19,8 @@ function main()
     ϕ0     = 0.01
     ϕref   = 0.01       # Reference porosity for which k_ηf_0 is a reference permeability
     nϕ     = 3.0
+    ρs0    = 3000
+    βs     = 1e-6
     dt     = 1e-6
     # Dependent
     ηb0    = Ωη * ηs0   # Bulk viscosity
@@ -58,7 +60,9 @@ function main()
     ηϕ    = ηb0*ones(nc...)
     ϕ     = (c=zeros(nc.x, nc.y), x=zeros(nv.x-2, nc.y), y =zeros(nc.x, nv.y-2))
     ϕold  = zeros(nc...)
-
+    ρsold  = zeros(nc...)
+    ρs    = ρs0 * ones(nc...)
+    
     # Initial condition
     @. ηs.v[x.v^2 + (y.v.^2)'<r^2] = ηs_ηs0 .* ηs0
     @. ηs.c = 0.25*(ηs.v[1:end-1,1:end-1] + ηs.v[2:end-0,1:end-1] + ηs.v[1:end-1,2:end-0] + ηs.v[2:end-0,2:end-0])
@@ -91,16 +95,17 @@ function main()
 
     # Time loop
     time = 0
-    for t = 1:100
-        @. ϕold = copy(ϕ.c)
+    for t = 1:50
+        @. ϕold  = copy(ϕ.c)
+        @. ρsold = copy(ρs)
         for it = 1:100
-            ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt, ηs_ini, ηb_ini  )   
+            ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt, ηs_ini, ηb_ini, βs, ρs0, ρs, ρsold  )
             nF .= [norm(Fm.x)/length(Fm.x); norm(Fm.y)/length(Fm.y); norm(FPt)/length(FPt); norm(FPf)/length(FPf)]
             if it==1 nF0 .= nF end
             rel_tol = maximum(nF     ) < ϵ
             abs_tol = maximum(nF./nF0) < ϵ
             if (abs_tol || rel_tol)
-                # print("Time step ", t, " converged in ", it, " iterations\n")
+                print("Time step ", t, " converged in ", it, " iterations\n")
                 # @printf("Fmx: abs = %1.4e --- rel = %1.4e \n", nF[1], nF[1]./nF0[1])
                 # @printf("Fmy: abs = %1.4e --- rel = %1.4e \n", nF[2], nF[2]./nF0[2])
                 # @printf("Fpt: abs = %1.4e --- rel = %1.4e \n", nF[3], nF[3]./nF0[3])
@@ -129,9 +134,9 @@ function main()
     @show mean(Pt)
     @show mean(Pf)
     @show minimum(ηs.c)
-    @show minimum(ηb)
+    @show minimum(ϕ.c)
     # Final residuals
-    ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt, ηs_ini, ηb_ini )
+    ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt, ηs_ini, ηb_ini, βs, ρs0, ρs, ρsold  )
 
     # Visualisation
     ε̇xy_c = 0.25*(ε̇.xy[1:end-1,1:end-1] + ε̇.xy[2:end-0,1:end-1] + ε̇.xy[1:end-1,2:end-0] + ε̇.xy[2:end-0,2:end-0]) 
@@ -146,7 +151,7 @@ function main()
     p5 = Plots.heatmap(x.c, y.c, Pf',             title="Pf")
     p6 = Plots.heatmap(x.c, y.c, ηb',            title="ηb")
     p7 = Plots.heatmap(x.c, y.c, divVs',          title="divVs")
-    p8 = Plots.heatmap(x.c, y.c, divqD',          title="divqD")
+    p8 = Plots.heatmap(x.c, y.c, ρs',          title="ρs")
     p9 = Plots.heatmap(x.c, y.c, ϕ.c * 100',            title="ϕ %")
     display(Plots.plot(p1, p2, p3, p4, p5, p6, p7, p8, p9))
 end
