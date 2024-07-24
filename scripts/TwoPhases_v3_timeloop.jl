@@ -9,7 +9,7 @@ function main()
     # k_ηf0 = f(Ωl, nϕ, k_ηf_ref)
 
     # Dimensionaless numbers
-    Ωl     = 10^0      # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
+    Ωl     = 10^1      # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
     Ωη     = 10^0      # Ratio ηb / ηs
     ηs_ηs0 = 10.0       # Ratio (inclusion viscosity) / (matrix viscosity)
     # Independent
@@ -20,7 +20,7 @@ function main()
     ϕref   = 0.01       # Reference porosity for which k_ηf_0 is a reference permeability
     nϕ     = 3.0
     ρs0    = 3000
-    βs     = 1e-6
+    βs     = 1e-4
     dt     = 1e-6
     # Dependent
     ηb0    = Ωη * ηs0   # Bulk viscosity
@@ -30,10 +30,8 @@ function main()
 
     xlim = (min=-len/2, max=len/2)
     ylim = (min=-len/2, max=len/2)
-    nc   = (x=100, y=100)
+    nc   = (x=50, y=50)
     nv   = (x=nc.x+1, y=nc.y+1)
-    nc   = (x=nc.x+0, y=nc.y+0)
-    nv   = (x=nv.x+0, y=nv.y+0)
     Δ    = (x=(xlim.max-xlim.min)/nc.x, y=(ylim.max-ylim.min)/nc.y)
     x    = (c=LinRange(xlim.min-Δ.x/2, xlim.max+Δ.x/2, nc.x), v=LinRange(xlim.min-Δ.x, xlim.max+Δ.x, nv.x))
     y    = (c=LinRange(ylim.min-Δ.y/2, ylim.max+Δ.y/2, nc.y), v=LinRange(ylim.min-Δ.y, ylim.max+Δ.y, nv.y))
@@ -65,11 +63,17 @@ function main()
     
     # Initial condition
     @. ηs.v[x.v^2 + (y.v.^2)'<r^2] = ηs_ηs0 .* ηs0
+    for smo=1:round(nc.x^2 / 1000)
+        Ii              = 2:nv.x-1;
+        kdiff           = 0.1;
+        @. ηs.v[Ii,:]       = ηs.v[Ii,:] + kdiff * (ηs.v[Ii+1,:] - 2*ηs.v[Ii,:] + ηs.v[Ii-1,:]);
+        @. ηs.v[:,Ii]       = ηs.v[:,Ii] + kdiff * (ηs.v[:,Ii+1] - 2*ηs.v[:,Ii] + ηs.v[:,Ii-1]);
+    end
     @. ηs.c = 0.25*(ηs.v[1:end-1,1:end-1] + ηs.v[2:end-0,1:end-1] + ηs.v[1:end-1,2:end-0] + ηs.v[2:end-0,2:end-0])
     @. ϕ.c   = ϕ0
     ηs_ini = (c = copy(ηs.c), v = copy(ηs.v))
     ηb_ini = copy(ηb)
-    
+
     # Pure shear
     BC   = (W=:Neumann, E=:Neumann, S=:Neumann, N=:Neumann)
     VxBC = (S=zeros(nv.x), N=zeros(nv.x))
@@ -95,7 +99,7 @@ function main()
 
     # Time loop
     time = 0
-    for t = 1:50
+    for t = 1:2
         @. ϕold  = copy(ϕ.c)
         @. ρsold = copy(ρs)
         for it = 1:100
@@ -105,7 +109,7 @@ function main()
             rel_tol = maximum(nF     ) < ϵ
             abs_tol = maximum(nF./nF0) < ϵ
             if (abs_tol || rel_tol)
-                print("Time step ", t, " converged in ", it, " iterations\n")
+                # print("Time step ", t, " converged in ", it, " iterations\n")
                 # @printf("Fmx: abs = %1.4e --- rel = %1.4e \n", nF[1], nF[1]./nF0[1])
                 # @printf("Fmy: abs = %1.4e --- rel = %1.4e \n", nF[2], nF[2]./nF0[2])
                 # @printf("Fpt: abs = %1.4e --- rel = %1.4e \n", nF[3], nF[3]./nF0[3])
@@ -143,7 +147,6 @@ function main()
     ε̇II   = sqrt.( 0.5*ε̇.xx.^2 + 0.5*ε̇.yy.^2 + ε̇xy_c.^2 )
     τxy_c = 0.25*(τ.xy[1:end-1,1:end-1] + τ.xy[2:end-0,1:end-1] + τ.xy[1:end-1,2:end-0] + τ.xy[2:end-0,2:end-0]) 
     τII   = sqrt.( 0.5*τ.xx.^2 + 0.5*τ.yy.^2 + τxy_c.^2 )
-    lc    = sqrt.(k_ηf0 * (ηb0 + 4/3 * ηs0))
     p1 = Plots.heatmap(x.v, y.c, V.x[:,2:end-1]', title="Vx")
     p2 = Plots.heatmap(x.c, y.v, V.y[2:end-1,:]', title="Vy")
     p3 = Plots.heatmap(x.c, y.c, ηs.c',            title="ηs")
