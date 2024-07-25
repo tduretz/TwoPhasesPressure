@@ -9,7 +9,7 @@ function main()
     # k_ηf0 = f(Ωl, nϕ, k_ηf_ref)
 
     # Dimensionaless numbers
-    Ωl     = 10^1      # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
+    Ωl     = 10^0      # Ratio √(k_ηf0 * (ηb + 4/3 * ηs)) / len
     Ωη     = 10^0      # Ratio ηb / ηs
     ηs_ηs0 = 10.0       # Ratio (inclusion viscosity) / (matrix viscosity)
     # Independent
@@ -20,7 +20,7 @@ function main()
     ϕref   = 0.01       # Reference porosity for which k_ηf_0 is a reference permeability
     nϕ     = 3.0
     ρs0    = 3000
-    βs     = 1e-4
+    βs     = 1e-6
     dt     = 1e-6
     # Dependent
     ηb0    = Ωη * ηs0   # Bulk viscosity
@@ -99,7 +99,7 @@ function main()
 
     # Time loop
     time = 0
-    for t = 1:2
+    for t = 1:10
         @. ϕold  = copy(ϕ.c)
         @. ρsold = copy(ρs)
         for it = 1:100
