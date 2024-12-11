@@ -41,6 +41,7 @@ function main()
     Pt    =  ones(nc...)
     Pf    = zeros(nc...)
     # Residuals
+    noisy = true
     ϵ     = 1e-11
     Fm    = (x=zeros(nv.x, nc.y), y=zeros(nc.x, nv.y))
     FPt   = zeros(nc...)
@@ -99,24 +100,27 @@ function main()
 
     # Time loop
     time = 0
-    for t = 1:10
+    for it = 1:20
+        @printf("------ Time step %4d ------\n", it)
         @. ϕold  = copy(ϕ.c)
         @. ρsold = copy(ρs)
-        for it = 1:100
+        for iter = 1:100
             ResidualsNonLinear!(Fm, FPt, FPf, V, Pt, Pf, divVs, divqD, ε̇, τ, qD, ηs, ηb, ηϕ, k_ηf, Δ, BC, VxBC, VyBC, ϕ, ϕold, k_ηf0, nϕ, dt, ηs_ini, ηb_ini, βs, ρs0, ρs, ρsold  )
             nF .= [norm(Fm.x)/length(Fm.x); norm(Fm.y)/length(Fm.y); norm(FPt)/length(FPt); norm(FPf)/length(FPf)]
-            if it==1 nF0 .= nF end
+            if iter==1 nF0 .= nF end
             rel_tol = maximum(nF     ) < ϵ
             abs_tol = maximum(nF./nF0) < ϵ
+            if noisy
+                @printf("It. %04d --- Fmx: abs = %1.4e --- rel = %1.4e \n", iter, nF[1], nF[1]./nF0[1])
+                @printf("It. %04d --- Fmy: abs = %1.4e --- rel = %1.4e \n", iter, nF[2], nF[2]./nF0[2])
+                @printf("It. %04d --- Fpt: abs = %1.4e --- rel = %1.4e \n", iter, nF[3], nF[3]./nF0[3])
+                @printf("It. %04d --- Fpf: abs = %1.4e --- rel = %1.4e \n", iter, nF[4], nF[4]./nF0[4]) 
+            end
             if (abs_tol || rel_tol)
-                # print("Time step ", t, " converged in ", it, " iterations\n")
-                # @printf("Fmx: abs = %1.4e --- rel = %1.4e \n", nF[1], nF[1]./nF0[1])
-                # @printf("Fmy: abs = %1.4e --- rel = %1.4e \n", nF[2], nF[2]./nF0[2])
-                # @printf("Fpt: abs = %1.4e --- rel = %1.4e \n", nF[3], nF[3]./nF0[3])
-                # @printf("Fpf: abs = %1.4e --- rel = %1.4e \n", nF[4], nF[4]./nF0[4]) 
+                print("Time step ", it, " converged in ", iter, " iterations\n")
                 break
-            elseif it == 100
-                print("Time step ", t, " did not converge\n")
+            elseif iter == 100
+                print("Time step ", it, " did not converge\n")
             end
             F[Num.Vx] = Fm.x[:]
             F[Num.Vy] = Fm.y[:]
@@ -132,7 +136,7 @@ function main()
             Pt             .+= δx[Num.Pt]
             Pf             .+= δx[Num.Pf]
         end # End iteration loop
-    if t%50 == 0 print("Ended time step ", t, "\n") end
+    if it%50 == 0 print("Ended time step ", it, "\n") end
     time += dt
     end # End time loop
     @show mean(Pt)
@@ -149,13 +153,13 @@ function main()
     τII   = sqrt.( 0.5*τ.xx.^2 + 0.5*τ.yy.^2 + τxy_c.^2 )
     p1 = Plots.heatmap(x.v, y.c, V.x[:,2:end-1]', title="Vx")
     p2 = Plots.heatmap(x.c, y.v, V.y[2:end-1,:]', title="Vy")
-    p3 = Plots.heatmap(x.c, y.c, ηs.c',            title="ηs")
-    p4 = Plots.heatmap(x.c, y.c, Pt',              title="Pt")
+    p3 = Plots.heatmap(x.c, y.c, ηs.c',           title="ηs")
+    p4 = Plots.heatmap(x.c, y.c, Pt',             title="Pt")
     p5 = Plots.heatmap(x.c, y.c, Pf',             title="Pf")
-    p6 = Plots.heatmap(x.c, y.c, ηb',            title="ηb")
+    p6 = Plots.heatmap(x.c, y.c, ηb',             title="ηb")
     p7 = Plots.heatmap(x.c, y.c, divVs',          title="divVs")
-    p8 = Plots.heatmap(x.c, y.c, ρs',          title="ρs")
-    p9 = Plots.heatmap(x.c, y.c, ϕ.c * 100',            title="ϕ %")
+    p8 = Plots.heatmap(x.c, y.c, ρs',             title="ρs")
+    p9 = Plots.heatmap(x.c, y.c, ϕ.c * 100',      title="ϕ %")
     display(Plots.plot(p1, p2, p3, p4, p5, p6, p7, p8, p9))
 end
 
